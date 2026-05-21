@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test \"test/**/*.mjs\"",
+    "test": "node --test test/*.mjs",
     "serve": "python -m http.server 4173"
   },
   "dependencies": {
