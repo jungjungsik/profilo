@@ -7,12 +7,13 @@ import { Router } from './router.js';
 import { isAuthenticated } from './auth.js';
 import { getProfile } from './store.js';
 
-import * as landing    from './views/landing.js';
-import * as signup     from './views/signup.js';
-import * as onboarding from './views/onboarding.js';
-import * as dashboard  from './views/dashboard.js';
-import * as profile    from './views/profile.js';
-import * as notFound   from './views/notFound.js';
+import * as landing       from './views/landing.js';
+import * as signup        from './views/signup.js';
+import * as onboarding    from './views/onboarding.js';
+import * as dashboard     from './views/dashboard.js';
+import * as profile       from './views/profile.js';
+import * as resetPassword from './views/resetPassword.js';
+import * as notFound      from './views/notFound.js';
 
 const router = new Router();
 
@@ -58,6 +59,9 @@ router.add('/onboarding', requireAuth(() => onboarding.render()));
 router.add('/dashboard', requireAuth(() => dashboard.render()));
 
 router.add('/u/:slug', ({ params }) => profile.render(params.slug));
+
+// Supabase redirects here after the user clicks the password-reset email link.
+router.add('/reset-password', () => resetPassword.render());
 
 router.notFound(() => notFound.render());
 

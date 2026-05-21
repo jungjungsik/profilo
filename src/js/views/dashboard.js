@@ -113,8 +113,8 @@ export function render() {
       button('Sign out', {
         variant: 'ghost',
         block: true,
-        onClick: () => {
-          signOut();
+        onClick: async () => {
+          await signOut();
           toast('Signed out', 'default');
           nav('/');
         },

@@ -1,142 +1,111 @@
 /**
- * auth.js — STUB authentication.
+ * auth.js — Supabase-backed authentication (JUN-5).
  *
- * STUB — to be replaced by real auth from issue JUN-5; keep this interface stable.
+ * Replaces the localStorage stub. Public interface is identical:
+ * signUp, signIn, signOut, currentUser, isAuthenticated, plus new resetPassword / updatePassword.
  *
- * This module provides a fully working signup/signin flow backed entirely by
- * local storage so the rest of the app can be built and tested end-to-end.
- * It is NOT secure: passwords are stored with a trivial reversible "hash"
- * (base64). Do not ship this to production — JUN-5 swaps the backend while
- * keeping these exported function signatures identical.
+ * signUp / signIn / signOut / resetPassword / updatePassword are async.
+ * currentUser / isAuthenticated are synchronous — they read from a cached
+ * session kept fresh via onAuthStateChange.
  */
 
-import storage from './storage.js';
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-// Storage keys.
-const USERS_KEY = 'auth:users';        // map of email -> user record (incl. pw hash)
-const SESSION_KEY = 'auth:session';    // id of the currently signed-in user
+const SUPABASE_URL = 'https://ztyvlgvxffssyamsibpf.supabase.co';
+const SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0eXZsZ3Z4ZmZzc3lhbXNpYnBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2MzU0MTYsImV4cCI6MjA3ODIxMTQxNn0.7tNgomPNQMgkv90KmmpG3gfpeeUu1fKrJ5rkmvbLU-M';
 
-// Basic email shape check — intentionally permissive, real validation is JUN-5.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 6;
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
 
-/**
- * STUB-only password "hash". btoa is base64 — trivially reversible and NOT
- * secure. Real auth (JUN-5) must use a proper one-way hash + salt server-side.
- */
-function stubHash(password) {
-  if (typeof btoa === 'function') return btoa(password);
-  // Node may not expose btoa on older runtimes; Buffer is the equivalent.
-  return Buffer.from(String(password), 'utf-8').toString('base64');
-}
+// Cached user for synchronous reads. Populated on module load and kept
+// current by the onAuthStateChange listener.
+let _cachedUser = null;
 
-/** Load the email -> userRecord map. */
-function loadUsers() {
-  return storage.get(USERS_KEY) || {};
-}
+// Bootstrap the cache from whatever session Supabase already restored from
+// localStorage (fire-and-forget; module stays synchronously importable).
+supabase.auth.getSession().then(({ data }) => {
+  _cachedUser = data?.session?.user ? toPublicUser(data.session.user) : null;
+});
 
-/** Persist the email -> userRecord map. */
-function saveUsers(users) {
-  storage.set(USERS_KEY, users);
-}
+supabase.auth.onAuthStateChange((_event, session) => {
+  _cachedUser = session?.user ? toPublicUser(session.user) : null;
+});
 
-/** Normalize emails so lookups are case/whitespace insensitive. */
-function normalizeEmail(email) {
-  return String(email ?? '').trim().toLowerCase();
-}
-
-/** Strip the internal password hash before handing a user to callers. */
-function publicUser(record) {
-  if (!record) return null;
-  const { id, email, createdAt } = record;
-  return { id, email, createdAt };
-}
-
-/** Generate a reasonably unique id without external dependencies. */
-function makeId() {
-  return `usr_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+function toPublicUser(user) {
+  if (!user) return null;
+  return { id: user.id, email: user.email, createdAt: user.created_at };
 }
 
 /**
- * Register a new user.
+ * Register a new user with email + password.
  * @param {{email:string, password:string}} credentials
- * @returns {{id:string, email:string, createdAt:string}}
- * @throws {Error} on invalid email, short password, or duplicate email.
+ * @returns {Promise<{id:string, email:string, createdAt:string}>}
  */
-export function signUp({ email, password } = {}) {
-  const normEmail = normalizeEmail(email);
-
-  if (!EMAIL_RE.test(normEmail)) {
-    throw new Error('Please enter a valid email address.');
-  }
-  if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
-    throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
-  }
-
-  const users = loadUsers();
-  if (users[normEmail]) {
-    throw new Error('An account with that email already exists.');
-  }
-
-  const record = {
-    id: makeId(),
-    email: normEmail,
-    createdAt: new Date().toISOString(),
-    passwordHash: stubHash(password),
-  };
-  users[normEmail] = record;
-  saveUsers(users);
-
-  // New signups are immediately signed in.
-  storage.set(SESSION_KEY, record.id);
-
-  return publicUser(record);
+export async function signUp({ email, password } = {}) {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw new Error(error.message);
+  if (!data.user) throw new Error('Sign-up failed — please try again.');
+  return toPublicUser(data.user);
 }
 
 /**
  * Sign in an existing user.
  * @param {{email:string, password:string}} credentials
- * @returns {{id:string, email:string, createdAt:string}}
- * @throws {Error} on unknown email or wrong password.
+ * @returns {Promise<{id:string, email:string, createdAt:string}>}
  */
-export function signIn({ email, password } = {}) {
-  const normEmail = normalizeEmail(email);
-  const users = loadUsers();
-  const record = users[normEmail];
-
-  if (!record) {
-    throw new Error('No account found for that email.');
-  }
-  if (record.passwordHash !== stubHash(password)) {
-    throw new Error('Incorrect password.');
-  }
-
-  storage.set(SESSION_KEY, record.id);
-  return publicUser(record);
-}
-
-/** Clear the current session. Always safe to call. */
-export function signOut() {
-  storage.remove(SESSION_KEY);
+export async function signIn({ email, password } = {}) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(error.message);
+  return toPublicUser(data.user);
 }
 
 /**
- * The currently signed-in user, or null.
+ * Sign out and clear the local session.
+ * @returns {Promise<void>}
+ */
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Send a password-reset email. The link redirects to #/reset-password.
+ * @param {string} email
+ * @returns {Promise<void>}
+ */
+export async function resetPassword(email) {
+  const redirectTo = `${location.origin}${location.pathname}#/reset-password`;
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Update the authenticated user's password (called after clicking the reset link).
+ * @param {string} newPassword
+ * @returns {Promise<void>}
+ */
+export async function updatePassword(newPassword) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * The currently signed-in user, or null. Synchronous.
  * @returns {{id:string, email:string, createdAt:string}|null}
  */
 export function currentUser() {
-  const sessionId = storage.get(SESSION_KEY);
-  if (!sessionId) return null;
-
-  const users = loadUsers();
-  for (const record of Object.values(users)) {
-    if (record.id === sessionId) return publicUser(record);
-  }
-  // Session points at a user that no longer exists — treat as signed out.
-  return null;
+  return _cachedUser;
 }
 
-/** @returns {boolean} whether a user is currently signed in. */
+/**
+ * Whether a user is currently signed in. Synchronous.
+ * @returns {boolean}
+ */
 export function isAuthenticated() {
-  return currentUser() !== null;
+  return _cachedUser !== null;
 }
