@@ -307,6 +307,34 @@ export function appShell(opts = {}, children = []) {
   ]);
 }
 
+/* ---- Global account nav ------------------------------------------------ */
+/**
+ * globalNav(current) — consistent header nav for an authenticated user.
+ *
+ * Renders the same two destinations on every signed-in screen so the editor
+ * is always one click away (dashboard, onboarding, the user's own public
+ * profile). Pass it as `appShell({ headerRight })`.
+ *
+ * @param {('dashboard'|'editor')} [current] highlights the active destination.
+ * @returns {Node} a <nav> of plain (non-primary) nav buttons.
+ */
+export function globalNav(current) {
+  const go = (path) => window.__profilo_navigate(path);
+
+  const link = (label, path, key) =>
+    el('button', {
+      type: 'button',
+      class: `nav-link${current === key ? ' nav-link--current' : ''}`,
+      'aria-current': current === key ? 'page' : null,
+      onClick: () => go(path),
+    }, label);
+
+  return el('nav', { class: 'global-nav', 'aria-label': 'Account navigation' }, [
+    link('Dashboard', '/dashboard', 'dashboard'),
+    link('Edit profile', '/onboarding', 'editor'),
+  ]);
+}
+
 /* ---- Misc helpers ------------------------------------------------------ */
 /** Copy text to clipboard with graceful fallback. Returns a Promise<boolean>. */
 export async function copyToClipboard(text) {

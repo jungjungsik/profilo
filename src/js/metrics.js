@@ -19,11 +19,13 @@ const EVENTS_KEY = 'metrics:events';
  */
 export const EVENTS = Object.freeze({
   LANDING_VIEW: 'landing_view',
+  SIGNUP_START: 'signup_start',
   SIGNUP_COMPLETE: 'signup_complete',
   ONBOARDING_STEP: 'onboarding_step',
   ONBOARDING_COMPLETE: 'onboarding_complete',
   PROFILE_PUBLISHED: 'profile_published',
   PROFILE_VIEWED: 'profile_viewed',
+  EDIT_PROFILE: 'edit_profile',
 });
 
 /** Load the append-only event log. */
@@ -98,12 +100,20 @@ function median(values) {
  *
  * @returns {{
  *   landingViews:number,
+ *   signupStarts:number,
  *   signups:number,
  *   onboardingCompletions:number,
  *   publishes:number,
+ *   editProfileEntries:number,
+ *   signupStartRate:number,           // signupStarts / landingViews, 0..1
  *   completionRate:number,            // onboardingCompletions / signups, 0..1
  *   medianTimeToValueMs:number|null   // median signup->publish across users
  * }}
+ *
+ * signupStartRate is the JUN-7 "CTA clarity" metric: the share of landing
+ * visitors who clicked the primary CTA through to the signup screen. edit
+ * ProfileEntries is the JUN-7 "navigation clarity" signal: how many times a
+ * returning user reached the profile editor.
  */
 export function getFunnel() {
   const events = loadEvents();
@@ -111,9 +121,14 @@ export function getFunnel() {
   const count = (name) => events.filter((e) => e.event === name).length;
 
   const landingViews = count(EVENTS.LANDING_VIEW);
+  const signupStarts = count(EVENTS.SIGNUP_START);
   const signups = count(EVENTS.SIGNUP_COMPLETE);
   const onboardingCompletions = count(EVENTS.ONBOARDING_COMPLETE);
   const publishes = count(EVENTS.PROFILE_PUBLISHED);
+  const editProfileEntries = count(EVENTS.EDIT_PROFILE);
+
+  // CTA click-through: share of landing views that started signup (0 when no views).
+  const signupStartRate = landingViews > 0 ? signupStarts / landingViews : 0;
 
   // Completion rate: share of signups that finished onboarding (0 when no signups).
   const completionRate = signups > 0 ? onboardingCompletions / signups : 0;
@@ -132,9 +147,12 @@ export function getFunnel() {
 
   return {
     landingViews,
+    signupStarts,
     signups,
     onboardingCompletions,
     publishes,
+    editProfileEntries,
+    signupStartRate,
     completionRate,
     medianTimeToValueMs: median(ttvSamples),
   };

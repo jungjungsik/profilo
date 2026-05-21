@@ -6,7 +6,7 @@
 
 import {
   el, mount, button, appShell, avatar, banner, toast,
-  copyToClipboard, shareUrl,
+  copyToClipboard, shareUrl, globalNav,
 } from '../components.js';
 import { currentUser, signOut } from '../auth.js';
 import { getProfile } from '../store.js';
@@ -65,7 +65,7 @@ export function render() {
               title: shareUrl(profile.slug),
             }, shareUrl(profile.slug)),
             button('Copy', {
-              variant: 'primary',
+              variant: 'secondary',
               size: 'sm',
               onClick: async (e) => {
                 const ok = await copyToClipboard(shareUrl(profile.slug));
@@ -121,7 +121,10 @@ export function render() {
       }),
     ]);
 
-    return appShell({ onBrandClick: () => nav('/dashboard') }, [
+    return appShell({
+      onBrandClick: () => nav('/dashboard'),
+      headerRight: globalNav('dashboard'),
+    }, [
       el('section', { class: 'section stack-lg' }, [
         el('div', { class: 'stack-sm' }, [
           el('p', { class: 'eyebrow' }, 'Your dashboard'),

@@ -5,8 +5,9 @@
    identical live preview.
    ========================================================================== */
 
-import { el, mount, button, appShell, avatar, hostLabel } from '../components.js';
+import { el, mount, button, appShell, avatar, hostLabel, globalNav } from '../components.js';
 import { getProfileBySlug } from '../store.js';
+import { currentUser } from '../auth.js';
 import { track, EVENTS } from '../metrics.js';
 
 const nav = (path) => window.__profilo_navigate(path);
@@ -116,7 +117,15 @@ export function render(slug) {
 
   track(EVENTS.PROFILE_VIEWED, { slug });
 
-  const view = appShell({ onBrandClick: () => nav('/') }, [
+  /* When the signed-in owner views their own page, keep the editor one click
+     away via the consistent global nav. Visitors see a clean, nav-free page. */
+  const user = currentUser();
+  const isOwner = !!user && profile.userId === user.id;
+
+  const view = appShell({
+    onBrandClick: () => nav('/'),
+    headerRight: isOwner ? globalNav() : null,
+  }, [
     el('section', { class: 'section profile-page' }, [
       el('div', { class: 'profile-canvas reveal' }, [
         profileCard(profile),

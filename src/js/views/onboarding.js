@@ -14,7 +14,7 @@
 
 import {
   el, mount, button, field, appShell, avatar, banner, toast,
-  progressStepper, copyToClipboard, shareUrl,
+  progressStepper, copyToClipboard, shareUrl, globalNav,
 } from '../components.js';
 import { currentUser } from '../auth.js';
 import {
@@ -36,6 +36,11 @@ const AVATAR_COLORS = [
 ];
 
 export function render() {
+  /* A returning user with a profile already on file is opening the EDITOR,
+     not running first-time onboarding — record it so the team can measure the
+     "profile edit" task (JUN-7 navigation-clarity metric). */
+  if (getProfile()) track(EVENTS.EDIT_PROFILE);
+
   /* Pre-fill: create-or-fetch a profile with smart defaults + 2 starter blocks.
      This is what guarantees the wizard is never blank. */
   const profile = ensureProfile();
@@ -342,7 +347,7 @@ export function render() {
     const url = shareUrl(p.slug);
 
     const copyBtn = button('Copy', {
-      variant: 'primary',
+      variant: 'secondary',
       size: 'sm',
       onClick: async (e) => {
         const ok = await copyToClipboard(url);
@@ -356,7 +361,10 @@ export function render() {
       },
     });
 
-    return appShell({ onBrandClick: () => nav('/') }, [
+    return appShell({
+      onBrandClick: () => nav('/'),
+      headerRight: globalNav(),
+    }, [
       el('section', { class: 'section success reveal' }, [
         el('div', { class: 'success__burst', 'aria-hidden': 'true' }, '✦'),
         el('p', { class: 'eyebrow' }, 'You’re live'),
@@ -370,8 +378,10 @@ export function render() {
         ]),
 
         el('div', { class: 'success__actions' }, [
+          /* One primary CTA per screen: viewing the live profile is the
+             headline next step right after publishing. */
           button('View my profile', {
-            variant: 'secondary',
+            variant: 'primary',
             size: 'lg',
             block: true,
             icon: '↗',
@@ -436,7 +446,10 @@ export function render() {
     ];
     const [title, sub] = headings[state.step - 1];
 
-    return appShell({ onBrandClick: () => nav('/dashboard') }, [
+    return appShell({
+      onBrandClick: () => nav('/dashboard'),
+      headerRight: globalNav('editor'),
+    }, [
       el('section', { class: 'section wizard' }, [
         el('div', { class: 'wizard__head' }, [
           progressStepper(state.step, TOTAL_STEPS, STEP_LABELS),

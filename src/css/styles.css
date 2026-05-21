@@ -175,6 +175,30 @@ h1, h2, h3 { line-height: var(--lh-tight); font-weight: 600; }
   box-shadow: var(--sh-sm);
 }
 
+/* consistent signed-in header nav — keeps the editor one click away */
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;                /* >= 44px touch target */
+  padding: 0 var(--s-2);           /* compact so the 360px header never clips */
+  border-radius: var(--r-sm);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--c-ink-soft);
+  background: none;
+  border: none;
+  white-space: nowrap;
+  transition: background-color var(--dur) var(--ease),
+              color var(--dur) var(--ease);
+}
+.nav-link:hover { color: var(--c-brand-deep); background: var(--c-surface-alt); }
+.nav-link--current { color: var(--c-brand-deep); background: var(--c-brand-soft); }
+
 .section { padding-top: var(--s-5); }
 .stack > * + * { margin-top: var(--s-4); }
 .stack-sm > * + * { margin-top: var(--s-2); }
@@ -244,7 +268,7 @@ h1, h2, h3 { line-height: var(--lh-tight); font-weight: 600; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 .btn--block { width: 100%; }
 .btn--lg { min-height: 54px; font-size: var(--t-md); padding: 0 var(--s-6); }
-.btn--sm { min-height: 40px; padding: 0 var(--s-4); font-size: var(--t-sm); }
+.btn--sm { min-height: 44px; padding: 0 var(--s-4); font-size: var(--t-sm); }
 
 .btn--primary {
   --btn-bg: var(--c-brand);
@@ -290,9 +314,12 @@ h1, h2, h3 { line-height: var(--lh-tight); font-weight: 600; }
 
 .btn__icon { font-size: 1.1em; line-height: 1; }
 
-/* a plain text link styled as a de-emphasized action */
+/* a plain text link styled as a de-emphasized action.
+   min-height keeps the tap target >= 44px even though the text is small. */
 .link-action {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   background: none;
   border: none;
   padding: var(--s-2);
@@ -504,7 +531,7 @@ h1, h2, h3 { line-height: var(--lh-tight); font-weight: 600; }
 .icon-btn {
   display: grid;
   place-items: center;
-  width: 36px; height: 36px;
+  width: 44px; height: 44px;   /* >= 44px touch target */
   border-radius: 9px;
   color: var(--c-ink-soft);
   background: transparent;
@@ -753,7 +780,7 @@ h1, h2, h3 { line-height: var(--lh-tight); font-weight: 600; }
   gap: var(--s-2);
 }
 .swatch {
-  width: 36px; height: 36px;
+  width: 44px; height: 44px;   /* >= 44px touch target */
   border-radius: 50%;
   border: 2.5px solid transparent;
   box-shadow: var(--sh-sm);

@@ -79,7 +79,11 @@ export function render() {
           size: 'lg',
           block: true,
           icon: '✦',
-          onClick: () => nav('/signup'),
+          onClick: () => {
+            /* CTA-clarity metric: count the click-through, then route. */
+            track(EVENTS.SIGNUP_START, { from: 'landing_hero' });
+            nav('/signup');
+          },
         }),
         el('p', { class: 'cta-sub muted' }, [
           'Already have an account? ',
