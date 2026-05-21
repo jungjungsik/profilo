@@ -9,6 +9,7 @@ import {
   isAuthenticated, isAuthConfigured, configureAuth, authReady,
 } from './auth.js';
 import { getProfile } from './store.js';
+import { initErrorTracking } from './errorTracking.js';
 
 import * as landing       from './views/landing.js';
 import * as signup        from './views/signup.js';
@@ -77,6 +78,7 @@ router.notFound(() => notFound.render());
    the dynamic import below (and its CDN dependency) runs in the browser only.
    `ready` is exported so tests can await a fully-booted app. */
 export const ready = (async () => {
+  initErrorTracking();
   if (!isAuthConfigured()) {
     const { createSupabaseClient } = await import('./supabaseClient.js');
     configureAuth(createSupabaseClient());
