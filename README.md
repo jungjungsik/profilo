@@ -23,27 +23,74 @@ content blocks) the moment onboarding begins.
 
 ---
 
-## How to run
+## Local development
 
-This is a static site. Any static file server works; the app uses ES modules,
-so it must be served over HTTP (opening `index.html` via `file://` will not
-load modules).
+### Prerequisites
 
-```bash
-# from the project root
-python -m http.server 4173
-# then open:
-#   http://localhost:4173
-```
+- Node.js 20+ (for tests)
+- Python 3 (for the dev server — any version with `http.server`)
+- Any modern browser
 
-Run the logic-core test suite (Node's built-in test runner):
+### Run the dev server
 
 ```bash
-node --test test/
+npm run serve
+# → http://localhost:4173
 ```
 
-> `test/` and the logic-core modules are delivered by a parallel workstream —
-> see **Handoff** below.
+The app uses ES modules, so it **must** be served over HTTP (`file://` won't work).
+
+### Run the test suite
+
+```bash
+npm test
+```
+
+Uses Node's built-in test runner — no extra install needed beyond `npm install`.
+
+### Install test dependencies (one-time)
+
+```bash
+npm install
+```
+
+---
+
+## CI/CD
+
+### How it works
+
+| Trigger | Action |
+|---------|--------|
+| Pull request to `main` | CI runs: `npm test` must pass |
+| Push (merge) to `main` | Auto-deploy to Vercel staging |
+
+Workflows live in `.github/workflows/`:
+- `ci.yml` — runs tests on every PR
+- `deploy.yml` — deploys to Vercel on every push to main
+
+### First-time Vercel setup (one-time, per repo)
+
+1. **Get your Vercel token** at [vercel.com/account/tokens](https://vercel.com/account/tokens) → create token → copy it.
+
+2. **Link the project with Vercel CLI:**
+
+   ```bash
+   npx vercel link
+   # follow prompts → links this repo to a Vercel project
+   # creates .vercel/project.json (gitignored)
+   cat .vercel/project.json
+   # note orgId and projectId
+   ```
+
+3. **Add GitHub repository secrets** at `Settings → Secrets → Actions`:
+   - `VERCEL_TOKEN` — the token from step 1
+   - `VERCEL_ORG_ID` — `orgId` from `.vercel/project.json`
+   - `VERCEL_PROJECT_ID` — `projectId` from `.vercel/project.json`
+
+After this, every merge to `main` deploys automatically.
+
+---
 
 ---
 
