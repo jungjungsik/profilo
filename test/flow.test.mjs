@@ -1,12 +1,17 @@
 /**
  * flow.test.mjs — end-to-end logic-core tests for the profile builder.
  *
- * Uses only node:test + node:assert/strict — zero npm dependencies.
+ * Uses node:test + node:assert/strict. The auth layer is the REAL adapter
+ * (src/js/auth.js); it runs against an in-memory Supabase fake injected via
+ * configureAuth(), so the suite exercises the production auth code offline
+ * and deterministically — signUp/signIn/signOut are async (a network backend
+ * cannot be synchronous), so call-sites here await them.
+ *
  * Run with:  node --test test/
  *
  * In Node there is no globalThis.localStorage, so storage.js transparently
- * uses its in-memory Map backend. storage.clear() resets it between tests,
- * keeping every test deterministic and independent.
+ * uses its in-memory Map backend. storage.clear() resets it between tests;
+ * a fresh fake auth client per test keeps every test deterministic.
  */
 
 import test from 'node:test';
@@ -14,12 +19,14 @@ import assert from 'node:assert/strict';
 
 import storage from '../src/js/storage.js';
 import {
+  configureAuth,
   signUp,
   signIn,
   signOut,
   currentUser,
   isAuthenticated,
 } from '../src/js/auth.js';
+import { createFakeSupabase } from './helpers/fake-supabase.js';
 import {
   ensureProfile,
   getProfile,
@@ -43,15 +50,16 @@ import {
 } from '../src/js/defaults.js';
 
 /** Reset all persisted state and the session before each test. */
-function resetState() {
-  signOut();
+async function resetState() {
+  // A fresh fake auth client per test — equivalent to a clean, empty backend.
+  await configureAuth(createFakeSupabase());
   storage.clear();
 }
 
-test('1. signUp creates a user and authenticates the session', () => {
-  resetState();
+test('1. signUp creates a user and authenticates the session', async () => {
+  await resetState();
 
-  const user = signUp({ email: 'jane.doe@example.com', password: 'secret123' });
+  const user = await signUp({ email: 'jane.doe@example.com', password: 'secret123' });
 
   assert.ok(user, 'signUp should return a user');
   assert.equal(typeof user.id, 'string');
@@ -60,16 +68,16 @@ test('1. signUp creates a user and authenticates the session', () => {
   assert.equal(isAuthenticated(), true, 'user should be authenticated after signUp');
   assert.equal(currentUser().id, user.id, 'currentUser should match the new user');
 
-  // Invalid input must throw.
-  assert.throws(() => signUp({ email: 'not-an-email', password: 'secret123' }));
-  assert.throws(() => signUp({ email: 'short@pw.com', password: '123' }));
-  // Duplicate email must throw.
-  assert.throws(() => signUp({ email: 'jane.doe@example.com', password: 'another1' }));
+  // Invalid input must reject.
+  await assert.rejects(signUp({ email: 'not-an-email', password: 'secret123' }));
+  await assert.rejects(signUp({ email: 'short@pw.com', password: '123' }));
+  // Duplicate email must reject.
+  await assert.rejects(signUp({ email: 'jane.doe@example.com', password: 'another1' }));
 });
 
-test('2. ensureProfile creates a non-empty profile from smart defaults', () => {
-  resetState();
-  signUp({ email: 'sam.smith@example.com', password: 'secret123' });
+test('2. ensureProfile creates a non-empty profile from smart defaults', async () => {
+  await resetState();
+  await signUp({ email: 'sam.smith@example.com', password: 'secret123' });
 
   const profile = ensureProfile();
 
@@ -92,13 +100,13 @@ test('2. ensureProfile creates a non-empty profile from smart defaults', () => {
   assert.equal(ensureProfile().id, profile.id);
 
   // ensureProfile must throw when not authenticated.
-  signOut();
+  await signOut();
   assert.throws(() => ensureProfile());
 });
 
-test('3. addBlock and updateProfile persist changes', () => {
-  resetState();
-  signUp({ email: 'pat@example.com', password: 'secret123' });
+test('3. addBlock and updateProfile persist changes', async () => {
+  await resetState();
+  await signUp({ email: 'pat@example.com', password: 'secret123' });
   ensureProfile();
 
   const beforeCount = getProfile().blocks.length;
@@ -114,9 +122,9 @@ test('3. addBlock and updateProfile persist changes', () => {
   assert.equal(getProfile().headline, 'Senior Widget Engineer', 'headline change is persisted');
 });
 
-test('4. publishProfile sets published, slug, and publishedAt', () => {
-  resetState();
-  signUp({ email: 'casey@example.com', password: 'secret123' });
+test('4. publishProfile sets published, slug, and publishedAt', async () => {
+  await resetState();
+  await signUp({ email: 'casey@example.com', password: 'secret123' });
   ensureProfile();
 
   const published = publishProfile();
@@ -127,9 +135,9 @@ test('4. publishProfile sets published, slug, and publishedAt', () => {
   assert.notEqual(published.publishedAt, null);
 });
 
-test('5. getProfileBySlug returns the published profile', () => {
-  resetState();
-  signUp({ email: 'robin@example.com', password: 'secret123' });
+test('5. getProfileBySlug returns the published profile', async () => {
+  await resetState();
+  await signUp({ email: 'robin@example.com', password: 'secret123' });
   ensureProfile();
 
   const published = publishProfile();
@@ -142,9 +150,9 @@ test('5. getProfileBySlug returns the published profile', () => {
   assert.equal(getProfileBySlug('no-such-slug'), null);
 });
 
-test('6. publishProfile throws when the profile has no blocks', () => {
-  resetState();
-  signUp({ email: 'alex@example.com', password: 'secret123' });
+test('6. publishProfile throws when the profile has no blocks', async () => {
+  await resetState();
+  await signUp({ email: 'alex@example.com', password: 'secret123' });
 
   let profile = ensureProfile();
 
@@ -158,9 +166,9 @@ test('6. publishProfile throws when the profile has no blocks', () => {
   assert.throws(() => publishProfile(), /at least one block/i);
 });
 
-test('7. metrics: timeToValue and funnel completionRate are computed', () => {
-  resetState();
-  const user = signUp({ email: 'morgan@example.com', password: 'secret123' });
+test('7. metrics: timeToValue and funnel completionRate are computed', async () => {
+  await resetState();
+  const user = await signUp({ email: 'morgan@example.com', password: 'secret123' });
 
   // Record a signup, then a publish a measurable moment later. We capture
   // explicit timestamps and assert ordering rather than relying on wall-clock
@@ -197,8 +205,8 @@ test('7. metrics: timeToValue and funnel completionRate are computed', () => {
 });
 
 test('7b. metrics: timeToValue returns a positive number for spaced events', async () => {
-  resetState();
-  const user = signUp({ email: 'jordan@example.com', password: 'secret123' });
+  await resetState();
+  const user = await signUp({ email: 'jordan@example.com', password: 'secret123' });
 
   track(EVENTS.SIGNUP_COMPLETE, { userId: user.id });
   // Wait a few milliseconds so the publish event has a strictly later stamp.
@@ -213,8 +221,8 @@ test('7b. metrics: timeToValue returns a positive number for spaced events', asy
   assert.equal(timeToValue('unknown-user'), null);
 });
 
-test('8. defaults: generateSlug and uniqueSlug behave correctly', () => {
-  resetState();
+test('8. defaults: generateSlug and uniqueSlug behave correctly', async () => {
+  await resetState();
 
   // generateSlug produces lowercase, hyphenated, ascii slugs.
   assert.equal(generateSlug('Hello World'), 'hello-world');
@@ -239,18 +247,29 @@ test('8. defaults: generateSlug and uniqueSlug behave correctly', () => {
   assert.deepEqual(types, ['link', 'text'], 'one text block and one link block');
 });
 
-test('9. auth: signIn rejects wrong credentials, accepts correct ones', () => {
-  resetState();
-  signUp({ email: 'dana@example.com', password: 'secret123' });
-  signOut();
+test('9. auth: signIn rejects wrong credentials, and the session survives a reload', async () => {
+  // A shared store stands in for persistent localStorage, so we can spin up a
+  // brand-new client over it later to simulate a full page reload.
+  const sharedStore = {};
+  await configureAuth(createFakeSupabase({ store: sharedStore }));
+  storage.clear();
+
+  await signUp({ email: 'dana@example.com', password: 'secret123' });
+  await signOut();
   assert.equal(isAuthenticated(), false, 'signed out after signOut');
 
-  // Wrong password / unknown email throw.
-  assert.throws(() => signIn({ email: 'dana@example.com', password: 'wrongpw' }));
-  assert.throws(() => signIn({ email: 'ghost@example.com', password: 'secret123' }));
+  // Wrong password / unknown email reject.
+  await assert.rejects(signIn({ email: 'dana@example.com', password: 'wrongpw' }));
+  await assert.rejects(signIn({ email: 'ghost@example.com', password: 'secret123' }));
 
   // Correct credentials succeed and restore the session.
-  const user = signIn({ email: 'dana@example.com', password: 'secret123' });
+  const user = await signIn({ email: 'dana@example.com', password: 'secret123' });
   assert.equal(user.email, 'dana@example.com');
   assert.equal(isAuthenticated(), true);
+
+  // Simulate a full page reload: a brand-new client over the SAME persisted
+  // store must restore the signed-in session (persistSession behaviour).
+  await configureAuth(createFakeSupabase({ store: sharedStore }));
+  assert.equal(isAuthenticated(), true, 'session survives a reload');
+  assert.equal(currentUser().email, 'dana@example.com', 'reloaded session keeps the user');
 });

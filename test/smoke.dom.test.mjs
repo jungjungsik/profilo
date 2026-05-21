@@ -6,12 +6,19 @@
    public profile. Asserts the CEO success definition is reached:
    profile.published === true AND content blocks >= 1.
 
+   Auth is the REAL adapter (src/js/auth.js) running against an in-memory
+   Supabase fake injected before the app boots — so this drives production
+   auth code offline. signUp is async, so the signup step awaits the UI.
+
    Run with: npm test   (jsdom is a devDependency)
    ========================================================================== */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
+
+import { configureAuth } from '../src/js/auth.js';
+import { createFakeSupabase } from './helpers/fake-supabase.js';
 
 /* ---- DOM environment ---------------------------------------------------- */
 const dom = new JSDOM(
@@ -48,9 +55,17 @@ function setInput(id, value) {
 function fireHashChange() {
   window.dispatchEvent(new window.Event('hashchange'));
 }
+/* Let pending async work (the real, awaited auth calls) settle. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-/* Boot the app. app.js calls router.start() at import time -> renders '/'. */
-await import('../src/js/app.js');
+/* Inject the in-memory auth client BEFORE the app boots, so app.js skips its
+   browser-only (CDN) client and runs entirely offline. */
+configureAuth(createFakeSupabase());
+
+/* Boot the app. app.js registers routes then starts the router once the auth
+   session is restored; `ready` resolves when that initial render is done. */
+const appModule = await import('../src/js/app.js');
+await appModule.ready;
 
 /* ---- the walk ---------------------------------------------------------- */
 test('1. landing page renders with a single primary CTA', () => {
@@ -68,11 +83,12 @@ test('2. CTA navigates to the signup screen', () => {
   assert.ok(document.getElementById('f-password'), 'signup password field present');
 });
 
-test('3. signup creates an account and enters the wizard', () => {
+test('3. signup creates an account and enters the wizard', async () => {
   setInput('f-email', 'newuser@example.com');
   setInput('f-password', 'secret123');
   app().querySelector('form')
     .dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();              // signup is async — let signUp() + nav resolve
   fireHashChange();            // signup -> nav('/onboarding')
   assert.ok(app().querySelector('[role="progressbar"]'),
     'wizard progress stepper should be visible');

@@ -31,7 +31,7 @@ export function render() {
       errors.password = 'Use at least 6 characters.';
     }
     if (state.password !== state.confirm) {
-      errors.confirm = 'Passwords don't match.';
+      errors.confirm = 'Passwords don’t match.';
     }
     if (Object.keys(errors).length > 0) {
       state.errors = errors;
@@ -46,7 +46,7 @@ export function render() {
       await updatePassword(state.password);
       state.done = true;
       state.submitting = false;
-      toast('Password updated — you're signed in', 'success');
+      toast('Password updated — you’re signed in', 'success');
       rerender();
       setTimeout(() => nav('/dashboard'), 1500);
     } catch (err) {

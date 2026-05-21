@@ -1,10 +1,13 @@
 /* ==========================================================================
    app.js — application bootstrap
-   Builds the hash router, registers routes, wires guards, and starts.
+   Builds the hash router, registers routes, wires guards, restores the auth
+   session, and starts routing.
    ========================================================================== */
 
 import { Router } from './router.js';
-import { isAuthenticated } from './auth.js';
+import {
+  isAuthenticated, isAuthConfigured, configureAuth, authReady,
+} from './auth.js';
 import { getProfile } from './store.js';
 
 import * as landing       from './views/landing.js';
@@ -65,4 +68,19 @@ router.add('/reset-password', () => resetPassword.render());
 
 router.notFound(() => notFound.render());
 
-router.start();
+/* ---- Boot -------------------------------------------------------------- */
+/* Wire the auth client and restore any persisted session BEFORE routing, so
+   the "/" redirect and route guards see the real signed-in state on a fresh
+   page load — this is what makes a session survive a reload.
+
+   The test suite injects an in-memory client before importing this module, so
+   the dynamic import below (and its CDN dependency) runs in the browser only.
+   `ready` is exported so tests can await a fully-booted app. */
+export const ready = (async () => {
+  if (!isAuthConfigured()) {
+    const { createSupabaseClient } = await import('./supabaseClient.js');
+    configureAuth(createSupabaseClient());
+  }
+  await authReady();
+  router.start();
+})();

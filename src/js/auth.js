@@ -1,44 +1,86 @@
 /**
- * auth.js — Supabase-backed authentication (JUN-5).
+ * auth.js — authentication adapter.
  *
- * Replaces the localStorage stub. Public interface is identical:
- * signUp, signIn, signOut, currentUser, isAuthenticated, plus new resetPassword / updatePassword.
+ * Public interface — STABLE; store.js and every view depend only on this:
+ *   signUp / signIn / signOut          async → resolve to {id,email,createdAt}
+ *   resetPassword / updatePassword     async
+ *   currentUser / isAuthenticated      sync  → read a cached session snapshot
  *
- * signUp / signIn / signOut / resetPassword / updatePassword are async.
- * currentUser / isAuthenticated are synchronous — they read from a cached
- * session kept fresh via onAuthStateChange.
+ * Backed by Supabase Auth. The Supabase client is INJECTED via configureAuth()
+ * rather than constructed here, for two reasons:
+ *
+ *   1. This module then imports cleanly under `node --test` — no CDN ESM URL
+ *      in the static graph, no network at import time.
+ *   2. The test suite injects an in-memory fake implementing the same
+ *      `supabase.auth.*` surface, so the suite exercises THIS real adapter
+ *      (error mapping, the synchronous session cache, onAuthStateChange
+ *      wiring) offline and deterministically — not a parallel stub module.
+ *
+ * The browser wires the real client in app.js (see src/js/supabaseClient.js).
  */
 
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+// The injected Supabase-compatible client (real client or test fake).
+let _client = null;
 
-const SUPABASE_URL = 'https://ztyvlgvxffssyamsibpf.supabase.co';
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0eXZsZ3Z4ZmZzc3lhbXNpYnBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2MzU0MTYsImV4cCI6MjA3ODIxMTQxNn0.7tNgomPNQMgkv90KmmpG3gfpeeUu1fKrJ5rkmvbLU-M';
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
-
-// Cached user for synchronous reads. Populated on module load and kept
-// current by the onAuthStateChange listener.
+// Synchronous snapshot of the signed-in user. Kept fresh by onAuthStateChange
+// and by the async calls below — this is what currentUser()/isAuthenticated()
+// read, so callers never have to await just to ask "who is signed in?".
 let _cachedUser = null;
 
-// Bootstrap the cache from whatever session Supabase already restored from
-// localStorage (fire-and-forget; module stays synchronously importable).
-supabase.auth.getSession().then(({ data }) => {
-  _cachedUser = data?.session?.user ? toPublicUser(data.session.user) : null;
-});
+// Resolves once the persisted session (if any) has been restored.
+let _ready = Promise.resolve();
 
-supabase.auth.onAuthStateChange((_event, session) => {
-  _cachedUser = session?.user ? toPublicUser(session.user) : null;
-});
-
+/** Project a raw Supabase user onto the app's stable public shape. */
 function toPublicUser(user) {
   if (!user) return null;
-  return { id: user.id, email: user.email, createdAt: user.created_at };
+  return {
+    id: user.id,
+    email: user.email,
+    createdAt: user.created_at ?? user.createdAt ?? null,
+  };
+}
+
+/** Return the injected client, or fail loudly if configureAuth() was skipped. */
+function client() {
+  if (!_client) {
+    throw new Error('Auth is not configured — call configureAuth() first.');
+  }
+  return _client;
+}
+
+/**
+ * Inject the Supabase-compatible client and wire the session cache.
+ * Safe to call again (tests re-inject a fresh fake per test).
+ * @param {{auth:object}} supabaseClient
+ * @returns {Promise<void>} resolves once any persisted session is restored.
+ */
+export function configureAuth(supabaseClient) {
+  _client = supabaseClient;
+  _cachedUser = null;
+
+  // Mirror every session change into the synchronous cache.
+  _client.auth.onAuthStateChange((_event, session) => {
+    _cachedUser = session && session.user ? toPublicUser(session.user) : null;
+  });
+
+  // Restore whatever session the client persisted — this is what lets a
+  // signed-in user survive a full page reload.
+  _ready = Promise.resolve(_client.auth.getSession()).then(({ data } = {}) => {
+    const session = data && data.session;
+    _cachedUser = session && session.user ? toPublicUser(session.user) : null;
+  });
+
+  return _ready;
+}
+
+/** Whether a client has been injected yet. */
+export function isAuthConfigured() {
+  return _client !== null;
+}
+
+/** Resolves once the initial session-restore performed by configureAuth() is done. */
+export function authReady() {
+  return _ready;
 }
 
 /**
@@ -47,10 +89,11 @@ function toPublicUser(user) {
  * @returns {Promise<{id:string, email:string, createdAt:string}>}
  */
 export async function signUp({ email, password } = {}) {
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await client().auth.signUp({ email, password });
   if (error) throw new Error(error.message);
-  if (!data.user) throw new Error('Sign-up failed — please try again.');
-  return toPublicUser(data.user);
+  if (!data || !data.user) throw new Error('Sign-up failed — please try again.');
+  _cachedUser = toPublicUser(data.user);
+  return _cachedUser;
 }
 
 /**
@@ -59,9 +102,11 @@ export async function signUp({ email, password } = {}) {
  * @returns {Promise<{id:string, email:string, createdAt:string}>}
  */
 export async function signIn({ email, password } = {}) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await client().auth.signInWithPassword({ email, password });
   if (error) throw new Error(error.message);
-  return toPublicUser(data.user);
+  if (!data || !data.user) throw new Error('Sign-in failed — please try again.');
+  _cachedUser = toPublicUser(data.user);
+  return _cachedUser;
 }
 
 /**
@@ -69,8 +114,9 @@ export async function signIn({ email, password } = {}) {
  * @returns {Promise<void>}
  */
 export async function signOut() {
-  const { error } = await supabase.auth.signOut();
+  const { error } = await client().auth.signOut();
   if (error) throw new Error(error.message);
+  _cachedUser = null;
 }
 
 /**
@@ -79,19 +125,23 @@ export async function signOut() {
  * @returns {Promise<void>}
  */
 export async function resetPassword(email) {
-  const redirectTo = `${location.origin}${location.pathname}#/reset-password`;
-  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  const redirectTo =
+    typeof location !== 'undefined' && location
+      ? `${location.origin}${location.pathname}#/reset-password`
+      : undefined;
+  const { error } = await client().auth.resetPasswordForEmail(email, { redirectTo });
   if (error) throw new Error(error.message);
 }
 
 /**
- * Update the authenticated user's password (called after clicking the reset link).
+ * Update the authenticated user's password (after clicking the reset link).
  * @param {string} newPassword
  * @returns {Promise<void>}
  */
 export async function updatePassword(newPassword) {
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  const { data, error } = await client().auth.updateUser({ password: newPassword });
   if (error) throw new Error(error.message);
+  if (data && data.user) _cachedUser = toPublicUser(data.user);
 }
 
 /**
