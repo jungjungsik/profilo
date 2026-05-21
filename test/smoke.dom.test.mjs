@@ -55,8 +55,20 @@ function setInput(id, value) {
 function fireHashChange() {
   window.dispatchEvent(new window.Event('hashchange'));
 }
-/* Let pending async work (the real, awaited auth calls) settle. */
+/* Let pending async work (the real, awaited auth calls and dynamic imports) settle. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/* Warm the module cache for every view so dynamic import() resolves as a
+   microtask in tests (cache hit), keeping settle() reliable. */
+await Promise.all([
+  import('../src/js/views/landing.js'),
+  import('../src/js/views/signup.js'),
+  import('../src/js/views/onboarding.js'),
+  import('../src/js/views/dashboard.js'),
+  import('../src/js/views/profile.js'),
+  import('../src/js/views/resetPassword.js'),
+  import('../src/js/views/notFound.js'),
+]);
 
 /* Inject the in-memory auth client BEFORE the app boots, so app.js skips its
    browser-only (CDN) client and runs entirely offline. */
@@ -76,9 +88,10 @@ test('1. landing page renders with a single primary CTA', () => {
     'exactly one primary CTA on the landing page');
 });
 
-test('2. CTA navigates to the signup screen', () => {
+test('2. CTA navigates to the signup screen', async () => {
   primary().click();           // onClick -> nav('/signup')
   fireHashChange();            // force deterministic route resolution
+  await settle();              // wait for dynamic import of signup.js
   assert.ok(document.getElementById('f-email'), 'signup email field present');
   assert.ok(document.getElementById('f-password'), 'signup password field present');
 });
@@ -90,6 +103,7 @@ test('3. signup creates an account and enters the wizard', async () => {
     .dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
   await settle();              // signup is async — let signUp() + nav resolve
   fireHashChange();            // signup -> nav('/onboarding')
+  await settle();              // wait for dynamic import of onboarding.js
   assert.ok(app().querySelector('[role="progressbar"]'),
     'wizard progress stepper should be visible');
 });
@@ -133,6 +147,7 @@ test('9. the public profile page renders at #/u/:slug', async () => {
   const slug = getProfile().slug;
   window.location.hash = `#/u/${slug}`;
   fireHashChange();
+  await settle();              // wait for dynamic import of profile.js
   assert.ok(app().querySelector('.profile-card'), 'public profile card renders');
   assert.ok(app().querySelector('.profile-name'), 'public profile shows a name');
 });

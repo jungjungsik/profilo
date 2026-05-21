@@ -61,6 +61,18 @@ function setInput(id, value) {
 const fireHashChange = () => window.dispatchEvent(new window.Event('hashchange'));
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+/* Warm the module cache for every view so dynamic import() resolves as a
+   microtask in tests (cache hit), keeping settle() reliable. */
+await Promise.all([
+  import('../src/js/views/landing.js'),
+  import('../src/js/views/signup.js'),
+  import('../src/js/views/onboarding.js'),
+  import('../src/js/views/dashboard.js'),
+  import('../src/js/views/profile.js'),
+  import('../src/js/views/resetPassword.js'),
+  import('../src/js/views/notFound.js'),
+]);
+
 /* Boot the real app offline against the in-memory auth fake. */
 configureAuth(createFakeSupabase());
 const appModule = await import('../src/js/app.js');
@@ -116,10 +128,11 @@ test('Fix 1: the landing page shows exactly one primary CTA', () => {
   assert.match(primaries()[0].textContent, /Create my profile/i);
 });
 
-test('Fix 1: clicking the landing CTA records a signup_start event', () => {
+test('Fix 1: clicking the landing CTA records a signup_start event', async () => {
   assert.equal(hasEvent('signup_start'), false, 'no signup_start before the click');
   primaries()[0].click();          // track(SIGNUP_START) + nav('/signup')
   fireHashChange();
+  await settle();                  // wait for dynamic import of signup.js
   assert.equal(hasEvent('signup_start'), true, 'CTA click tracks signup_start');
   assert.ok(document.getElementById('f-email'), 'CTA routed to the signup screen');
 });
@@ -140,6 +153,7 @@ test('Fix 1: publishing reaches a success screen with exactly one primary CTA', 
     .dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
   await settle();                              // async signUp() + nav resolve
   fireHashChange();                            // -> /onboarding wizard
+  await settle();                              // wait for dynamic import of onboarding.js
   assert.ok(app().querySelector('[role="progressbar"]'), 'wizard renders');
 
   byText('.btn--primary', 'Continue').click(); // step 1 -> 2
@@ -161,9 +175,10 @@ test('Fix 3: the success screen carries the consistent global nav', () => {
   assert.ok(byText('.nav-link', 'Dashboard'), '"Dashboard" link present');
 });
 
-test('Fix 3: "Edit profile" is a one-click route into the editor', () => {
+test('Fix 3: "Edit profile" is a one-click route into the editor', async () => {
   byText('.nav-link', 'Edit profile').click();   // a single click
   fireHashChange();
+  await settle();              // wait for dynamic import of onboarding.js
   assert.ok(app().querySelector('[role="progressbar"]'),
     'one click on "Edit profile" opens the editor wizard');
 });
@@ -175,9 +190,10 @@ test('Fix 3: reaching the editor records an edit_profile event', () => {
     'funnel counts at least one edit-profile entry');
 });
 
-test('Fix 3: the dashboard carries the same global nav (consistency)', () => {
+test('Fix 3: the dashboard carries the same global nav (consistency)', async () => {
   window.location.hash = '#/dashboard';
   fireHashChange();
+  await settle();              // wait for dynamic import of dashboard.js
   assert.ok(app().querySelector('.global-nav'), 'global nav present on the dashboard');
   assert.ok(byText('.nav-link', 'Edit profile'),
     'dashboard keeps "Edit profile" one click away');

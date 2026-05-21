@@ -80,16 +80,17 @@ export class Router {
 
   /**
    * Begin routing: bind to hashchange and resolve the current URL once.
+   * Returns a Promise that resolves after the initial route handler completes,
+   * so callers can await the first render (e.g. `await router.start()`).
    * No-op in non-browser environments.
-   * @returns {Router} this.
+   * @returns {Promise<Router>}
    */
   start() {
     if (typeof window !== 'undefined' && window && typeof window.addEventListener === 'function') {
       window.addEventListener('hashchange', this._onHashChange);
     }
-    // Resolve the initial location immediately (guarded internally).
-    this._resolve();
-    return this;
+    // Resolve the initial location and return the promise so boot can await it.
+    return this._resolve().then(() => this);
   }
 
   /** Stop listening for hash changes. Safe to call anytime. */
@@ -125,9 +126,12 @@ export class Router {
 
   /**
    * Match the current path against registered routes and invoke the handler.
+   * Returns a Promise so async handlers (e.g. those using dynamic import) can
+   * be awaited by start() and navigate() in test environments.
    * @private
+   * @returns {Promise<void>}
    */
-  _resolve() {
+  async _resolve() {
     const path = currentPath();
 
     for (const route of this._routes) {
@@ -138,14 +142,14 @@ export class Router {
         route.keys.forEach((key, i) => {
           params[key] = decodeURIComponent(match[i + 1]);
         });
-        route.handler({ params });
+        await route.handler({ params });
         return;
       }
     }
 
     // Nothing matched — fall back if a handler was registered.
     if (typeof this._notFound === 'function') {
-      this._notFound({ params: {} });
+      await this._notFound({ params: {} });
     }
   }
 }
