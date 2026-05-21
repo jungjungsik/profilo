@@ -63,32 +63,13 @@ npm install
 | Trigger | Action |
 |---------|--------|
 | Pull request to `main` | CI runs: `npm test` must pass |
-| Push (merge) to `main` | Auto-deploy to Vercel staging |
+| Push (merge) to `main` | Auto-deploy to GitHub Pages staging |
+
+Staging URL: **https://jungjungsik.github.io/profilo/**
 
 Workflows live in `.github/workflows/`:
-- `ci.yml` — runs tests on every PR
-- `deploy.yml` — deploys to Vercel on every push to main
-
-### First-time Vercel setup (one-time, per repo)
-
-1. **Get your Vercel token** at [vercel.com/account/tokens](https://vercel.com/account/tokens) → create token → copy it.
-
-2. **Link the project with Vercel CLI:**
-
-   ```bash
-   npx vercel link
-   # follow prompts → links this repo to a Vercel project
-   # creates .vercel/project.json (gitignored)
-   cat .vercel/project.json
-   # note orgId and projectId
-   ```
-
-3. **Add GitHub repository secrets** at `Settings → Secrets → Actions`:
-   - `VERCEL_TOKEN` — the token from step 1
-   - `VERCEL_ORG_ID` — `orgId` from `.vercel/project.json`
-   - `VERCEL_PROJECT_ID` — `projectId` from `.vercel/project.json`
-
-After this, every merge to `main` deploys automatically.
+- `ci.yml` — runs tests on every PR and push to main
+- `deploy.yml` — deploys to GitHub Pages on every push to main (zero secrets needed)
 
 ---
 
