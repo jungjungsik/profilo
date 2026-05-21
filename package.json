@@ -1,0 +1,12 @@
+{
+  "name": "profile-builder",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/**/*.mjs\"",
+    "serve": "python -m http.server 4173"
+  },
+  "dependencies": {
+    "jsdom": "^25.0.1"
+  }
+}
