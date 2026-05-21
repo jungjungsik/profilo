@@ -9,9 +9,14 @@ import { track, EVENTS } from '../metrics.js';
 
 const nav = (path) => window.__profilo_navigate(path);
 
-function makeState() {
+/* Modes a route may request as the *entry* screen. 'forgot' is reached only
+   via in-screen navigation, never linked to directly, so it is not an entry. */
+const ENTRY_MODES = new Set(['signup', 'signin']);
+
+function makeState(initialMode) {
   return {
-    mode: 'signup',          // 'signup' | 'signin' | 'forgot'
+    // Honour an explicit entry mode; fall back to 'signup' for any other value.
+    mode: ENTRY_MODES.has(initialMode) ? initialMode : 'signup',  // 'signup' | 'signin' | 'forgot'
     email: '',
     password: '',
     errors: {},
@@ -38,8 +43,15 @@ function validate(state) {
   return errors;
 }
 
-export function render() {
-  const state = makeState();
+/**
+ * Render the auth screen.
+ * @param {'signup'|'signin'} [initialMode] which screen to open on. Defaults
+ *   to 'signup'; the '/signin' route passes 'signin' so a returning visitor
+ *   lands on the sign-in form in one click instead of toggling out of the
+ *   signup form (JUN-15).
+ */
+export function render(initialMode) {
+  const state = makeState(initialMode);
 
   function rerender() {
     mount(buildView());

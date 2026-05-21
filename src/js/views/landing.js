@@ -89,7 +89,8 @@ export function render() {
           'Already have an account? ',
           el('button', {
             class: 'link-action',
-            onClick: () => nav('/signup'),
+            /* Returning user — route straight to sign-in mode (JUN-15). */
+            onClick: () => nav('/signin'),
           }, 'Sign in'),
         ]),
       ]),

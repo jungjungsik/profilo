@@ -52,7 +52,19 @@ router.add('/signup', async () => {
     return;
   }
   const { render } = await import('./views/signup.js');
-  render();
+  render('signup');
+});
+
+/* Same auth screen, opened straight to sign-in mode. A returning visitor who
+   clicks "Sign in" should land on "Welcome back" in one click rather than the
+   signup form they then have to toggle out of (JUN-15). */
+router.add('/signin', async () => {
+  if (isAuthenticated()) {
+    router.navigate('/dashboard');
+    return;
+  }
+  const { render } = await import('./views/signup.js');
+  render('signin');
 });
 
 router.add('/onboarding', requireAuth(async () => {
