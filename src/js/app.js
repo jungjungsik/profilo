@@ -93,7 +93,9 @@ export const ready = (async () => {
   initErrorTracking();
   if (!isAuthConfigured()) {
     const { createSupabaseClient } = await import('./supabaseClient.js');
-    configureAuth(createSupabaseClient());
+    const _supabase = createSupabaseClient();
+    configureAuth(_supabase);
+    window.__profilo_supabase = _supabase;
   }
   await authReady();
   await router.start();

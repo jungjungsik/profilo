@@ -130,7 +130,7 @@ test('7. publishing reaches the first-value moment (shareable URL)', () => {
   byText('.btn--primary', 'Publish').click();   // doPublish()
   const url = app().querySelector('.share-box__url');
   assert.ok(url, 'success screen shows a shareable URL');
-  assert.match(url.textContent, /#\/u\//, 'URL is a shareable profile link');
+  assert.match(url.textContent, /\/u\//, 'URL is a shareable profile link');
   assert.match(txt(), /published/i, 'success copy confirms the profile is live');
 });
 

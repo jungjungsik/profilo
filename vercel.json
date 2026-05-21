@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "buildCommand": null,
+  "outputDirectory": ".",
+  "framework": null,
+  "rewrites": [
+    { "source": "/u/:slug", "destination": "/api/u/[slug]" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

@@ -37,13 +37,17 @@ function compilePattern(pattern) {
   return { regex: new RegExp(`^${source}/?$`), keys };
 }
 
-/** Read the current hash path ("/foo"), Node-safe. Defaults to "/". */
+/** Read the current routing path, Node-safe. Defaults to '/'.
+ * Supports hash routing (#/foo) and path-based routing (/u/slug)
+ * served by the Vercel edge function. */
 function currentPath() {
   if (typeof location === 'undefined' || !location) return '/';
   const hash = location.hash || '';
-  // Strip the leading "#", keep the path. "" -> "/".
   const path = hash.replace(/^#/, '');
-  return path || '/';
+  if (path) return path;
+  // No hash: if on a non-root pathname (e.g. /u/slug from edge fn), use it.
+  const pathname = (location.pathname || '/').replace(/[/]index[.]html$/, '') || '/';
+  return pathname;
 }
 
 export class Router {

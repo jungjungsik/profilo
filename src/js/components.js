@@ -363,7 +363,7 @@ export async function copyToClipboard(text) {
 
 /** Build the full shareable URL for a profile slug. */
 export function shareUrl(slug) {
-  return `${location.origin}${location.pathname}#/u/${slug}`;
+  return `${location.origin}/u/${slug}`;
 }
 
 /** Best-effort label for a hostname from a URL string. */

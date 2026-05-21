@@ -23,6 +23,7 @@ import {
 } from '../store.js';
 import { track, EVENTS } from '../metrics.js';
 import { profileCard } from './profile.js';
+import { syncPublishedProfile } from '../profileSync.js';
 
 const nav = (path) => window.__profilo_navigate(path);
 
@@ -331,6 +332,7 @@ export function render() {
         userId: user ? user.id : null,
         slug: published.slug,
       });
+      syncPublishedProfile(published).catch(() => {}); // non-fatal Supabase sync
       state.published = true;
       rerender();
     } catch (err) {
