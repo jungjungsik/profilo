@@ -56,8 +56,20 @@ export class Router {
     this._routes = [];
     /** @type {Function|null} */
     this._notFound = null;
+    /** @type {Function|null} */
+    this._beforeEach = null;
     // Bound so it can be added/removed as an event listener cleanly.
     this._onHashChange = this._resolve.bind(this);
+  }
+
+  /**
+   * Register a callback invoked before every route resolution.
+   * @param {Function} fn
+   * @returns {Router} this, for chaining.
+   */
+  beforeEach(fn) {
+    this._beforeEach = fn;
+    return this;
   }
 
   /**
@@ -137,6 +149,7 @@ export class Router {
    */
   async _resolve() {
     const path = currentPath();
+    if (typeof this._beforeEach === 'function') this._beforeEach({ path });
 
     for (const route of this._routes) {
       const match = route.regex.exec(path);

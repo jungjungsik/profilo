@@ -14,7 +14,7 @@
 
 import {
   el, mount, button, field, appShell, avatar, banner, toast,
-  progressStepper, copyToClipboard, shareUrl, globalNav,
+  progressStepper, copyToClipboard, shareUrl, globalNav, signalViewTransition,
 } from '../components.js';
 import { currentUser } from '../auth.js';
 import {
@@ -56,6 +56,7 @@ export function render() {
   function goToStep(n) {
     state.step = Math.max(1, Math.min(TOTAL_STEPS, n));
     track(EVENTS.ONBOARDING_STEP, { step: state.step });
+    signalViewTransition();
     rerender();
   }
 
@@ -334,6 +335,7 @@ export function render() {
       });
       syncPublishedProfile(published).catch(() => {}); // non-fatal Supabase sync
       state.published = true;
+      signalViewTransition();
       rerender();
     } catch (err) {
       state.publishError = err && err.message

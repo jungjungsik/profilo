@@ -64,12 +64,32 @@ function appendChildren(node, children) {
   }
 }
 
+/**
+ * Signal that the next mount() call is a view transition (route change or
+ * wizard step change). mount() consumes this flag to move focus to the new
+ * heading and announce it to screen readers without re-reading the full page.
+ */
+let _focusNextHeading = false;
+export function signalViewTransition() {
+  _focusNextHeading = true;
+}
+
 /** Replace the contents of #app with the given node(s) and scroll to top. */
 export function mount(node) {
   const app = document.getElementById('app');
   app.replaceChildren();
   appendChildren(app, node);
   window.scrollTo(0, 0);
+  if (_focusNextHeading) {
+    _focusNextHeading = false;
+    const h1 = app.querySelector('h1');
+    if (h1) {
+      h1.setAttribute('tabindex', '-1');
+      h1.focus({ preventScroll: true });
+      const announcer = document.getElementById('route-announcer');
+      if (announcer) announcer.textContent = h1.textContent;
+    }
+  }
 }
 
 /* ---- Buttons ----------------------------------------------------------- */

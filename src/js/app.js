@@ -13,8 +13,10 @@ import {
 } from './auth.js';
 import { getProfile } from './store.js';
 import { initErrorTracking } from './errorTracking.js';
+import { signalViewTransition } from './components.js';
 
 const router = new Router();
+router.beforeEach(() => signalViewTransition());
 
 /* Make the router available to every view for navigation, without each view
    needing to import the singleton instance. */
