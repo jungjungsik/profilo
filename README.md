@@ -210,3 +210,24 @@ router           new Router() · .add(pattern,handler) · .notFound(fn)
 
 If the logic-core contract changes, only `src/js/views/*` and `components.js`
 should need to adapt.
+
+## Deployment
+
+### Vercel (Production — SEO-enabled)
+
+Public profile pages (`/u/<slug>`) are served by a Vercel serverless function that injects per-profile OG/Twitter meta tags, enabling rich social previews and search indexing.
+
+**One-time setup:**
+1. Go to [vercel.com/new](https://vercel.com/new) → Import `jungjungsik/profilo`
+2. Framework: Other · Output Directory: `.` · Build Command: (empty)
+3. After project creation, grab the 3 secrets from Project Settings → General:
+   - `VERCEL_TOKEN` — from your [Vercel account tokens](https://vercel.com/account/tokens)
+   - `VERCEL_ORG_ID` — `orgId` in `.vercel/project.json`
+   - `VERCEL_PROJECT_ID` — `projectId` in `.vercel/project.json`
+4. Add those 3 values as [GitHub repo secrets](https://github.com/jungjungsik/profilo/settings/secrets/actions)
+
+After setup, every push to `main` automatically deploys to Vercel via `.github/workflows/deploy-vercel.yml`.
+
+### GitHub Pages (Fallback — no OG meta)
+
+`https://jungjungsik.github.io/profilo/` — SPA only, no per-profile meta tags.
